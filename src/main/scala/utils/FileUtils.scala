@@ -6,6 +6,12 @@ import java.nio.file.{Files, Paths}
 import scala.util.Try
 
 object FileUtils {
+  /**
+   * writes the content into file with given filename
+   * @param filename filename
+   * @param content content to write in file
+   * @return Unit
+  */
   def writeToFile(filename: String, content: String): Unit = {
     val logger: MyLogger = getLogger(getClass.getName)
 

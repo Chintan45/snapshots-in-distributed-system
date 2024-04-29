@@ -24,7 +24,26 @@ This project implements two snapshot algorithms, Chandy-Lamport and Lai-Yang, us
 
 - **`FileUtils.scala`**: contains the functions for file handling
 
-- **`MyLogger`**: Custom logger using slf4j library
+- **`MyLogger.scala`**: Custom logger using slf4j library
+
+- **`application.conf`** contains the configurations of application
+
+- **`graph.ngs.dot`** contains the edges between nodes
+
+- **`transactions.txt`** stores the message transactions input 
+
+### Workflow
+<div style="text-align:center;">
+    <img src="workflow.jpg"
+    width="400px" 
+    alt="workflow">
+</div>
+
+
+The diagram depicts the design of my Akka system, which is used for implementing two algorithms. There are two types of actors: the RootProcessor Actor, responsible for handling transactions read from a file and propagating them to Process Actors; and the Process Actors, which simulate the processes of a distributed system. They communicate with one another through message passing.
+
+The implementation of the Process Actor differs between the two algorithms. In the Chandy-Lamport algorithm, a Marker message is used to prompt other processes to take a local snapshot, whereas in the Lai-Yang algorithm, a control message is sent in response to the channel's non-FIFO behavior to coordinate the snapshot process.
+
 
 ### Usage
 
@@ -44,7 +63,7 @@ This project implements two snapshot algorithms, Chandy-Lamport and Lai-Yang, us
     ```
     sbt "runMain com.snapshot.LaiYang.LaiYangSnapshot"
     ```
-5. Follow the prompts to set up the Akka system and read transactions from the files.
+5. Follow the prompts to **set up the Akka system** and **read transactions** from the files.
 ![instructions](./instructions.png)
 
 6. After execution, find the snapshots stored in the snapshots folder for each process in json formate like
@@ -56,6 +75,11 @@ This project implements two snapshot algorithms, Chandy-Lamport and Lai-Yang, us
     "12" : [ "m2", "m3" ]
   }
 }
+```
+
+### Run Testcases
+```
+sbt test
 ```
 
 ### Dependencies

@@ -16,7 +16,9 @@ import utils.FileUtils.writeToFile
 
 import scala.io.Source
 
-
+/**
+ * Process Actor that manages internal state and communication with other process actors.
+ */
 object myProcessActor2 {
   sealed trait Message
   case class BasicMessage(senderName: String, to: String, messageValue: String, isRecorded:Boolean) extends Message
@@ -35,6 +37,7 @@ object myProcessActor2 {
           case (from, to) => s"$from$to" -> mutable.Set[String]()
         }.toMap
 
+        // method to save computed state
         def saveState():Unit = {
           val actorState = ActorState(processId, channelState)
           val stateJson = Json.prettyPrint(Json.toJson(actorState))
@@ -42,6 +45,7 @@ object myProcessActor2 {
           writeToFile(fileName, stateJson)
         }
 
+        //method to take local snapshot
         def takeSnapshot(process:String = null):Unit = {
           if(!RootProcessor2.recorded(process)) {
             RootProcessor2.recorded(process) = true
@@ -74,16 +78,16 @@ object myProcessActor2 {
         }
 
         Behaviors.receiveMessage {
-          // handle basic message received by other process
+          // handle basic message sent by other process
           case BasicMessage(from, to, messageValue, recorded) =>
             logger.info(s"Basic message $messageValue, $recorded received @ $to")
             if (recorded) {
               takeSnapshot(to)
             } else {
               val currentChannel = s"$from$to"
-              RootProcessor2.counter(currentChannel) = RootProcessor2.counter(currentChannel) - 1
+              RootProcessor2.counter(currentChannel) = RootProcessor2.counter(currentChannel) - 1 // updating counter
               if (RootProcessor2.recorded(to)) {
-                channelState(currentChannel).add(messageValue)
+                channelState(currentChannel).add(messageValue) // computing channel state
                 if (hasProcessCaptured) {
                   saveState()
                   logger.info(s"Process $to received all control + basic Msgs")
@@ -92,13 +96,13 @@ object myProcessActor2 {
             }
             Behaviors.same
 
-          // handle control message received by other process
+          // handle control message sent by other process
           case ControlMessage(from, to, preSnapMsgCount) =>
             logger.info(s"ControlMessage Received @ $processId")
             val ch = s"${from}${to}"
             RootProcessor2.counter(ch) = RootProcessor2.counter(ch) + preSnapMsgCount
 
-            takeSnapshot(to)
+            takeSnapshot(to) // taking snapshot
 
             if (hasProcessCaptured) {
               logger.info(s"Process $to received all control + basic Msgs")
@@ -117,7 +121,9 @@ object myProcessActor2 {
   }
 }
 
-
+/**
+ * The root actor responsible for setting up the system and initiating the snapshot algorithm across all process actors.
+ */
 object RootProcessor2 {
   sealed trait Message
   case class Setup(nodes: Set[String], edges: Set[(String, String)]) extends Message
@@ -129,17 +135,19 @@ object RootProcessor2 {
 
   private case object Timeout extends Message  // Internal command for handling timeout
   val logger: MyLogger = getLogger(getClass.getName)
+  val config = ConfigFactory.load()
 
   def apply(): Behavior[Message] = Behaviors.setup {
     context =>
       Behaviors.withTimers {
         timers =>
-          var buffer = List.empty[(BasicMessage, Boolean)]
+          var buffer = List.empty[(BasicMessage, Boolean)] // implementing Buffer for non-FIFO channel
 
+          // flushing buffer
           def flushBuffer(): Unit = {
             Random.shuffle(buffer).foreach{
               case (basicMsg, recorded) =>
-                Thread.sleep(1000)
+                Thread.sleep(config.getInt("Snapshot.processDelay"))
                 val receivingProcessRef = actors(basicMsg.to)
                 receivingProcessRef ! myProcessActor2.BasicMessage(
                   senderName = basicMsg.from,
@@ -151,6 +159,7 @@ object RootProcessor2 {
             buffer = List.empty
           }
 
+          // scheduling timeout to flush the buffer
           def scheduleTimeout(): Unit = {
             val config = ConfigFactory.load()
             val bufferTimeOut = config.getInt("Snapshot.LaiYang.bufferTimeOut")
@@ -161,6 +170,7 @@ object RootProcessor2 {
             // handle setup input
             case Setup(nodes, edges) =>
               logger.info("Starting system...")
+              // creating process actors for each node
               nodes.foreach { node =>
                 val inChannels = edges.filter { case (_, dest) => dest == node }
                 val outChannels = edges.filter { case (source, _) => source == node }
@@ -182,7 +192,7 @@ object RootProcessor2 {
                 val currentChannel = s"${sendMessage.from}${sendMessage.to}"
                 counter(currentChannel) = counter(currentChannel) + 1
               }
-              if (buffer.size == 5) {
+              if (buffer.size == config.getInt("Snapshot.LaiYang.bufferLimit")) { // flush buffer if reach at limit
                 timers.cancel("timeout")
                 flushBuffer()
               } else {
@@ -207,6 +217,10 @@ object RootProcessor2 {
   }
 }
 
+/**
+ * Main Object for running Lai Yang Snapshot Algorithm.
+ * It initializes the actor system and processes commands to set up the system and initiate snapshots.
+ */
 object LaiYangSnapshot {
   def main(args: Array[String]): Unit = {
     val config = ConfigFactory.load()
@@ -235,6 +249,7 @@ object LaiYangSnapshot {
     while(true) {
       val ip = readLine()
       ip.toLowerCase() match {
+        // handle set input from command line: setup akka system
         case "setup" =>
           if(!hasSystemStarted) {
             Processor ! RootProcessor2.Setup(parsedGraph.nodes, parsedGraph.edges)
@@ -242,6 +257,7 @@ object LaiYangSnapshot {
           } else {
             logger.warn("System has already been setup!")
           }
+        // handle read input from command line: read transactions
         case "read" =>
           if(!hasSystemStarted) {
             logger.warn("Please setup the system first!")
@@ -260,6 +276,9 @@ object LaiYangSnapshot {
       }
     }
 
+    /**
+     * Processes a single line from file, dispatches messages or initiates the snapshot.
+     */
     def processLine(line: String): Unit = line match {
       case messagePattern(source, dest, msg) =>
         if(!parsedGraph.edges.contains((source, dest))) {

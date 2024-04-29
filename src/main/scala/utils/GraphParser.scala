@@ -4,7 +4,11 @@ import scala.io.Source
 
 object GraphParser {
   case class Graph(nodes: Set[String], edges: Set[(String, String)])
-
+  /**
+   * parse the dot.ngs files to Graph with nodes and edges
+   * @param filePath path of the file
+   * @return Graph
+   */
   def parseGraph(filePath: String): Graph = {
     var nodes = Set[String]()
     var edges = Set[(String, String)]()

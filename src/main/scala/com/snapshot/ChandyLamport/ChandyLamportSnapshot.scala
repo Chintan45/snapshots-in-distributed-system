@@ -16,7 +16,9 @@ import utils.FileUtils.writeToFile
 
 import scala.io.Source
 
-
+/**
+ * Process Actor that manages internal state and communication with other process actors.
+ */
 object myProcessActor {
   sealed trait Message
   case class BasicMessage(senderName: String, to: String, messageValue: String) extends Message
@@ -38,15 +40,17 @@ object myProcessActor {
           case (from, to) => s"$from$to" -> mutable.Queue[String]()
         }.toMap
 
+
+        // method to take local snapshot of current process
         def takeSnapshot(markerFrom:String = null):Unit = {
           if(!recorded) {
             recorded = true
+            // take a local snapshot of current process
             val actorState = ActorState(processId, channelState)
             val stateJson = Json.prettyPrint(Json.toJson(actorState))
-            // take a local snapshot of current process
             val fileName = s"$processId-snapshot.json"
             writeToFile(fileName, stateJson)
-            // send <market> to each outgoing channel of current process
+            // send <marker> to each outgoing channel of current process
             outChannels.foreach {
               case (from, to) =>
                 if(markerFrom != to) {
@@ -60,26 +64,35 @@ object myProcessActor {
         }
 
         Behaviors.receiveMessage {
+          // handle basic message sent by other process
           case BasicMessage(from, to, messageValue) =>
             recorded = false
             val incomingMessageChannel = s"$from$to"
-            channelState(incomingMessageChannel).enqueue(messageValue)
+            channelState(incomingMessageChannel).enqueue(messageValue) // computing channel state
             Behaviors.same
+
+          // handle Marker message sent by other process
           case Marker(from, to) =>
             if(from != to ) { logger.info(s"Marker Received @ $processId") }
-            takeSnapshot()
+            takeSnapshot() // take snapshot
             val incomingMessageChannel = s"$from$to"
-            marker(incomingMessageChannel) = true
+            marker(incomingMessageChannel) = true // marking marker received from incoming channel
+            // checking if marker received from al incoming channel
             if(marker.values.forall( _ == true)) {
-              logger.info(s"processId: $processId received marker from all incoming channels. Global SS has been taken!")
+              logger.info(s"processId: $processId received marker from all incoming channels. Local SS has been taken!")
             }
             Behaviors.same
+
+          // handle other case if encountered
           case _ =>
             Behaviors.unhandled
         }
     }
 }
 
+/**
+ * The Root Actor responsible for setting up the system and initiating the snapshot algorithm across all process actors.
+ */
 private object RootProcessor {
   sealed trait Message
   case class Setup(nodes: Set[String], edges: Set[(String, String)]) extends Message
@@ -95,6 +108,7 @@ private object RootProcessor {
         // handle start input
         case Setup(nodes, edges) =>
           logger.info("Starting system...")
+          // creating process actors for each node
           nodes.foreach { node =>
             val inChannels = edges.filter { case (_, dest) => dest == node }
             val outChannels = edges.filter { case (source, _) => source == node }
@@ -122,6 +136,10 @@ private object RootProcessor {
   }
 }
 
+/**
+ * Main Object for running Chandy Lamport Snapshot Algorithm.
+ * It initializes the actor system and processes commands to set up the system and initiate snapshots.
+ */
 object ChandyLamportSnapshot {
   def main(args: Array[String]): Unit = {
     val config = ConfigFactory.load()
@@ -150,6 +168,7 @@ object ChandyLamportSnapshot {
     while(true) {
       val ip = readLine()
       ip.toLowerCase() match {
+        // handle set input from command line: setup akka system
         case "setup" =>
           if(!hasSystemStarted) {
             Processor ! RootProcessor.Setup(parsedGraph.nodes, parsedGraph.edges)
@@ -157,6 +176,7 @@ object ChandyLamportSnapshot {
           } else {
             logger.warn("System has already been setup!")
           }
+        // handle read input from command line: read transactions
         case "read" =>
           if(!hasSystemStarted) {
             logger.warn("Please setup the system first!")
@@ -175,6 +195,9 @@ object ChandyLamportSnapshot {
       }
     }
 
+    /**
+     * Processes a single line from file, dispatches messages or initiates the snapshot.
+     */
     def processLine(line: String): Unit = line match {
       case messagePattern(source, dest, msg) =>
         if(!parsedGraph.edges.contains((source, dest))) {
