@@ -1,4 +1,4 @@
-# Snapshot Algorithms Implementation
+# Snapshot Algorithms in Distributed Systems
 
 This project implements two snapshot algorithms, Chandy-Lamport and Lai-Yang, using Akka actors in Scala. Each algorithm is implemented in a separate package within the project.
 
@@ -9,6 +9,7 @@ This project implements two snapshot algorithms, Chandy-Lamport and Lai-Yang, us
    - It prompts the user to input `setup` to set up the Akka system and `read` to read transactions from the `transactions1.txt` file stored in the resources folder.
    - After successful execution, snapshots for each process are stored in the `snapshots` folder in JSON format.
 <br/>
+
 2. **LaiYang**: Contains the implementation of the Lai-Yang snapshot algorithm.
    - To execute: `sbt "runMain com.snapshot.LaiYang.LaiYangSnapshot"`
    - It prompts the user to input `setup` to set up the Akka system and `read` to read transactions from the `transactions2.txt` file stored in the resources folder.
@@ -29,11 +30,11 @@ This project implements two snapshot algorithms, Chandy-Lamport and Lai-Yang, us
 
 1. Clone the repository:
    ``` 
-   git clone <repository_url> 
+   git clone git@github.com:Chintan45/snapshots-in-distributed-system.git 
    ```
 2. Navigate to the project directory:
     ```
-    cd <project_directory>
+    cd snapshots-in-distributed-system
     ```
 3. Compile and run the Chandy-Lamport algorithm:
     ```
@@ -58,12 +59,12 @@ This project implements two snapshot algorithms, Chandy-Lamport and Lai-Yang, us
 ```
 
 ### Dependencies
-**Scala version**: 2.13.13
-**sbt version**: 1.9.9
-**Akka Actors**: 2.8.5
-**ScalaTest**: 3.2.18
-**Typesafe Config**: 1.4.3
-**Play JSON**: 2.10.4
-**Logback Classic**: 1.5.6
-**SLF4J API**: 2.0.12
+- **Scala version**: 2.13.13
+- **sbt version**: 1.9.9
+- **Akka Actors**: 2.8.5
+- **ScalaTest**: 3.2.18
+- **Typesafe Config**: 1.4.3
+- **Play JSON**: 2.10.4
+- **Logback Classic**: 1.5.6
+- **SLF4J API**: 2.0.12
 
